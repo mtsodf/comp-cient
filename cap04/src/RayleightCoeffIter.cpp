@@ -51,10 +51,6 @@ void RaileightCoefIter(double *A, double *x, int n, double *autovalor, int log){
 	ipiv = (int*) malloc(sizeof(int)*n);
 	Ac = (double *)mkl_malloc( n*n*sizeof( double ), 64);
 
-	for (int i = 0; i < n*n; ++i) {
-		Ac[i] = A[i];
-	}
-
 	alocar(&y, n);
 
 	do{
@@ -63,7 +59,6 @@ void RaileightCoefIter(double *A, double *x, int n, double *autovalor, int log){
 		cblas_dcopy (n, x, 1, xant, 1);
 
 		cblas_dgemv (CblasRowMajor, CblasNoTrans, n, n, 1.0, A, n, x, 1, 0.0, y, 1);
-
 		sigma = cblas_ddot (n, x, 1, y, 1);
 		sigma = sigma /cblas_ddot(n, x, 1, x, 1);
 
@@ -83,7 +78,6 @@ void RaileightCoefIter(double *A, double *x, int n, double *autovalor, int log){
 			Ac[d] = A[d] - sigma;
 			d += n + 1;
 		}
-
 		dgesv( &n, &nrhs, Ac, &n, ipiv, x, &n, &info );
 
         if( info > 0 ) {
@@ -171,7 +165,7 @@ int main() {
 	}
 
 
-	RodarRandomico(A, n, 20);
+	RodarRandomico(A, n, 10);
 
 	return 0;
 
