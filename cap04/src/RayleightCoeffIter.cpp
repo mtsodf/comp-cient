@@ -35,7 +35,7 @@ void printMat(double *x, int n){
 
 }
 
-void RaileightCoefIter(double *A, double *x, int n, double *autovalor, int log){
+void RaileightCoefIter(double *A, double *x, int n, double *autovalor,int *qtd_passos ,int log){
 	int info;
 
 	double *y, *xant;
@@ -50,7 +50,7 @@ void RaileightCoefIter(double *A, double *x, int n, double *autovalor, int log){
 	alocar(&xant, n);
 	ipiv = (int*) malloc(sizeof(int)*n);
 	Ac = (double *)mkl_malloc( n*n*sizeof( double ), 64);
-
+	*qtd_passos = 0;
 	alocar(&y, n);
 
 	do{
@@ -98,6 +98,7 @@ void RaileightCoefIter(double *A, double *x, int n, double *autovalor, int log){
 
 		norm = xant[cblas_idamax (n, xant, 1)];
 		norm = norm > 0 ? norm: -norm;
+		*qtd_passos += 1;
 	}while(norm > 1e-6);
 
 	*autovalor = sigma;
@@ -129,10 +130,10 @@ void RodarRandomico(double *A, int n, int iteracoes){
 		for (int i = 0; i < n; ++i) {
 			x[i] = randomDouble();
 		}
+		int passos;
+		RaileightCoefIter(A, x, n, &autovalor, &passos, 0);
 
-		RaileightCoefIter(A, x, n, &autovalor, 0);
-
-		printVec(x, n); printf("   |%14.6lf", autovalor);
+		printVec(x, n); printf("   |%14.6lf\t%3d", autovalor, passos);
 		printf("\n");
 
 	}
@@ -175,11 +176,11 @@ int main() {
 	printf("\tChute Inicial\n\t\t");
 	printVec(x, n);printf("\n");
 
-
+	int passos;
 	printf("\n**********************************************\n");
 	printf("              Inicio do Algoritmo\n");
 	printf("**********************************************\n\n");
-	RaileightCoefIter(A, x, n, &autovalor, 1);
+	RaileightCoefIter(A, x, n, &autovalor, &passos ,1);
 
 
 
