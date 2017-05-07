@@ -1,0 +1,1 @@
+add_executable(programa_5_1 programa_5_1.c)
