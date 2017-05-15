@@ -4,9 +4,8 @@
 /* Estrutura para guardar as matrizes 
  *
  *
-*/
-struct struct_matriz 
-{
+ */
+struct struct_matriz {
 	double** val;
 	int* desloc;
 	int n;
@@ -22,5 +21,5 @@ typedef struct struct_matriz matriz;
 
 void cg(matriz, double*, double*, double*);
 void cg_precon(matriz, double*, double*, double*);
-void mat_mult(int, matriz, double* , double*);
-int solve_steepest_descent(int, matriz, double*, double*, double, int*);
+void mat_mult(int, matriz, double*, double*);
+int solve_steepest_descent(int, matriz, double*, double*, double, int*, double*);

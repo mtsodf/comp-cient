@@ -170,7 +170,7 @@ void cg(matriz A, double* b, double * x0, double *rnorm){
  * Obs.: algoritmo pag 142 do livro do Yousef Saad
  * Link: http://www-users.cs.umn.edu/~saad/IterMethBook_2ndEd.pdf
  */
-int solve_steepest_descent(int N, matriz A, double* x, double* b, double tol, int* numiter) {
+int solve_steepest_descent(int N, matriz A, double* x, double* b, double tol, int* numiter, double* res) {
 	double* p = (double*) malloc(N * sizeof(double));
 	double* Ap = (double*) malloc(N * sizeof(double));
 	//r <- b - A*x
@@ -194,8 +194,11 @@ int solve_steepest_descent(int N, matriz A, double* x, double* b, double tol, in
 		//r <- r - alpha*p
 		cblas_daxpy(N, -alpha, p, 1, b, 1);
 
-		double res = cblas_dnrm2(N, b, 1);
-		if (res < tol)
+		*res = cblas_dnrm2(N, b, 1);
+
+		printf("Residuo = %f\n", *res);
+
+		if (*res < tol)
 			convergiu = TRUE;
 		else
 			//p <- A*r
