@@ -2,23 +2,12 @@
 #include <stdlib.h>
 #include <mkl.h>
 #include <math.h>
+#include "solvers.h"
 
 
-/* Estrutura para guardar as matrizes 
- *
- *
-*/
-struct struct_matriz 
-{
-	double** val;
-	int* desloc;
-	int n;
-	int nd;
-};
 
 
-typedef struct struct_matriz matriz;
-
+void printMatriz(matriz);
 
 void printVec(int n, double *v){
 	for (int i = 0; i < n; ++i)
@@ -29,6 +18,16 @@ void printVec(int n, double *v){
 	printf("\n");
 }
 
+void printVecFile(int n, double *v, FILE* f){
+	for (int i = 0; i < n; ++i)
+	{
+		fprintf(f, "%10.4lf", v[i]);
+	}
+
+	fprintf(f, "\n");
+}
+
+
 
 double ld(double x, double y){
 	return exp(x) + exp(y);
@@ -36,80 +35,59 @@ double ld(double x, double y){
 	//return exp(x);
 }
 
-/* Calcula o produto A*b e retorna em r.
-*  O vetor r deve estar previamente alocado.
-*/
-void matmult(int n, matriz A, double *b, double *r){
-
-	double *aux = (double *) malloc(sizeof(double)*n);
 
 
-	for (int i = 0; i < A.nd; ++i)
-	{	
-		int dsl = A.desloc[i];
-		vdMul(n-dsl, A.val[i], b+dsl, aux);
+void set_element(matriz A, int i, int j, double v){
+	int aux;
 
-		if(i > 0){
-			//Diagonal Superior
-			cblas_daxpy (n-dsl, 1.0, aux, 1, r, 1);
-
-			//Diagonal Inferior
-			vdMul(n-dsl, A.val[i], b, aux);
-			cblas_daxpy (n-dsl, 1.0, aux, 1, r+dsl, 1);
-
-		} else{
-			cblas_dcopy (n, aux, 1, r, 1);
-		}
-
+	if(j < i){
+		aux = i;
+		i = j;
+		j = aux;
 	}
 
+	int desloc = j - i;
 
-	free(aux);
+	for (int k = 0; k < A.nd; ++k)
+	{
+		if(A.desloc[k] == desloc){
+			A.val[k][i] = v; 
+			return ;
+		}
+	}
+
+	printf("Setando valor fora das diagonais de A\n");
+	v = 1.0 / 0.0;
 }
 
 
-void cg(matriz A, double* b, double * x0){
-	double *r, *p;
-	double *Ap;
-	double rnorm, alpha, rdotr, rdotr2, beta;
-
-	Ap = (double*) malloc(sizeof(double)*A.n);
-	 p = (double*) malloc(sizeof(double)*A.n);
-	r  = b;
 
 
-	matmult(A.n, A, x0, Ap);
 
-	cblas_daxpy (A.n, -1.0, Ap, 1, r, 1);
+void calc_sol(int n, double *sol){
+	double h = 1.0 / n;
+	int ind = 0;
+	double x, y;
 
-	rnorm = cblas_dnrm2 (A.n, r, 1);
-	cblas_dcopy (A.n, r, 1, p, 1);
+	for (int j = 0; j < n - 1; ++j)
+	{	
+		y = (j+1)*h;
+		for (int i = 0; i < n - 1 ; ++i)
+		{
+			x = (i+1)*h;
+			sol[ind] = exp(x) + exp(y);
 
-	while(rnorm > 1e-10){
-		matmult(A.n, A, p, Ap);
-
-		rdotr = cblas_ddot(A.n, r, 1, r, 1);
-
-		alpha =  rdotr/ cblas_ddot(A.n, Ap, 1, p, 1);
-
-		cblas_daxpy (A.n, alpha, p, 1, x0, 1);
-		cblas_daxpy (A.n, -alpha, Ap, 1, r, 1);
-
-		rdotr2 = cblas_ddot(A.n, r, 1, r, 1);
-
-		beta = cblas_ddot(A.n, r, 1, r, 1) / rdotr;
-
-		//pj = beta*pj
-		cblas_dscal (A.n, beta, p, 1);
-
-		//$p_(j+1) = r + beta*pj$
-		cblas_daxpy (A.n, 1.0, r, 1, p, 1);
-
-		rnorm = sqrt(rdotr2);
+			ind++;
+		}
 	}
+}
 
-	free(Ap);
-	
+void printMatriz(matriz A){
+	for (int i = 0; i < A.nd; ++i)
+	{	
+		printf("Diagonal %d = ", A.desloc[i]);
+		printVec(A.n-A.desloc[i], A.val[i]);
+	}
 }
 
 void laplace(int n){
@@ -118,7 +96,11 @@ void laplace(int n){
 
 	double h = 1.0 / n;
 
+	double rnorm;
+
 	int unknows = (n-1)*(n-1);
+
+	FILE* saida;
 
 	matriz A;
 
@@ -138,16 +120,18 @@ void laplace(int n){
 
 	b = (double*) malloc(sizeof(double) * (n-1)*(n-1));
 
-	for (int i = 0; i < (unknows); ++i) A.val[0][i] = -4 /(2*h) ;
+	for (int i = 0; i < (unknows); ++i) A.val[0][i] = -4/(h*h) ;
+
+
 	for (int i = 0; i < (unknows-1); ++i) {
-		if(i%(n-1) == n- 2){
+		if(i%(n-1) == n-2){
 			A.val[1][i] = 0.0 ;
 		} else{
-			A.val[1][i] = 1/(2*h) ;
+			A.val[1][i] = 1/(h*h) ;
 		}
 		
 	}
-	for (int i = 0; i < (unknows-n+1); ++i) A.val[2][i] = 1/(2*h) ;
+	for (int i = 0; i < (unknows-n+1); ++i) A.val[2][i] = 1/(h*h) ;
 
 
 	// Criando lado direito
@@ -162,7 +146,7 @@ void laplace(int n){
 
 			b[ind] = ld(x,y);
 
-			printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
+			//printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
 		}
 	}
 
@@ -173,14 +157,14 @@ void laplace(int n){
 		double x = 0.0;
 		double y = (j+1) * h;	
 
-		printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
-		b[ind] -= ld(x, y)/(2*h);
+		//printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
+		b[ind] -= ld(x, y)/(h*h);
 
 		ind = j*(n-1) + n - 2;	
 		x = 1.0;
 
-		printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
-		b[ind] -= ld(x,y)/(2*h);
+		//printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
+		b[ind] -= ld(x,y)/(h*h);
 
 	}	
 
@@ -191,25 +175,16 @@ void laplace(int n){
 		double x = (i+1) * h;
 		double y = 0.0;	
 
-		printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
-		b[ind] -= ld(x, y)/(2*h);
+		//printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
+		b[ind] -= ld(x, y)/(h*h);
 
-		ind = (n-2)*(n-1) + i;	
+		ind = (n-2)*(n-1) + i;
 		y = 1.0;
 
-		printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
-		b[ind] -= ld(x,y)/(2*h);
+		//printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
+		b[ind] -= ld(x,y)/(h*h);
 
 	}		
-
-	printf("b = ");
-	printVec(unknows, b);
-
-	for (int i = 0; i < A.nd; ++i)
-	{	
-		printf("Diagonal %d = ", A.desloc[i]);
-		printVec(A.n-A.desloc[i], A.val[i]);
-	}
 
 	double *x0 = (double*) malloc(sizeof(double)*A.n);
 	for (int i = 0; i < A.n; ++i)
@@ -217,13 +192,37 @@ void laplace(int n){
 		x0[i] = 1.0;
 	}
 	
-	cg(A, b, x0);
+	//cg_precon(A, b, x0, &rnorm);
+	int niters;
+	solve_steepest_descent(A.n, A, x0, b, 1e-10, &niters);
 	
+	saida = fopen("saida.txt", "w");
+
+	fprintf(saida, "n = %d\n", n);
+
+	fprintf(saida, "\nSolucao Encontrada\n");
 	for (int i = 0; i < n - 1; ++i)
 	{
-		printVec(n-1, x0 + i*(n-1));
+		printVecFile(n-1, x0 + i*(n-1), saida);
 	}
 	
+	double * sol = (double *) malloc(sizeof(double)*unknows);
+	calc_sol(n, sol);
+
+
+	fprintf(saida, "\nSolucao Real\n");
+	for (int i = 0; i < n - 1; ++i)
+	{
+		printVecFile(n-1, sol + i*(n-1), saida);
+	}
+
+	cblas_daxpy (unknows, -1.0, x0, 1, sol, 1);
+
+	fprintf(saida, "\n\tNorma Residuo = %lf\n", rnorm);
+	printf("\n\tNorma Residuo = %lf\n", rnorm);
+
+	fclose(saida);
+
 }
 
 
