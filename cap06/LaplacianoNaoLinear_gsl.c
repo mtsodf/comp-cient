@@ -7,7 +7,6 @@
 #define dT  0.0001
 
 
-
 /*
  * Calcula o valor de k na interface
  */
@@ -178,15 +177,31 @@ void calc_jacobiano(gsl_spmatrix* A, int n, gsl_vector *T) {
 	}
 }
 
+void get_jacobi(gsl_spmatrix* A , gsl_vector* jacobi){
+	for(int i = 0; i <A->size1; i++){
+		gsl_vector_set(jacobi, i, 1/gsl_spmatrix_get(A, i, i));
+	}
+}
 
+void apply_jacobi_mat(gsl_spmatrix* A , gsl_vector* jacobi){
+	int i; 
+	for(int k = 0; k < A->nz; k++){
+		i = A->i[k];
+		A->data[k] *= gsl_vector_get(jacobi, i);
+	}
+}
+
+void apply_jacobi_vec(gsl_vector* x , gsl_vector* jacobi){
+	for(int i = 0; i < x->size; i++){
+		x->data[i] *= gsl_vector_get(jacobi, i);
+	}
+}
 
 
 int main(int argc, char **argv) {
 
 	int n = atoi(argv[1]);
 	printf("n = %d \n", n);
-
-
 
 	int unknows = (n - 1) * (n - 1);
 	int status, iter, newton_steps = 0;
@@ -195,11 +210,16 @@ int main(int argc, char **argv) {
 	double tol_newton = 1e-4;
 	const gsl_splinalg_itersolve_type *Solver = gsl_splinalg_itersolve_gmres;
 	double rnorm;
+	int use_jacobi = 0;
 	gsl_splinalg_itersolve *gmres_solver = gsl_splinalg_itersolve_alloc(Solver, unknows, 0);
 
 	if(argc > 2){
-		tol_newton = atof(argv[2]);
-		tol_linear = atof(argv[3]);
+		use_jacobi = atoi(argv[2]);
+	}
+
+	if(argc > 3){
+		tol_newton = atof(argv[3]);
+		tol_linear = atof(argv[4]);
 	}
 
 	gsl_vector* T = gsl_vector_alloc(unknows);
@@ -212,11 +232,12 @@ int main(int argc, char **argv) {
 	//Alocando Vetores
 	gsl_vector* r = gsl_vector_alloc(unknows);
 	gsl_vector* dx = gsl_vector_alloc(unknows);
+	gsl_vector* jacobi = gsl_vector_alloc(unknows);
 	gsl_vector_set_zero (dx);
 
 	printf("Toleracia Newton = %e\n", tol_newton);
 	printf("Toleracia Linear = %e\n", tol_linear);
-
+	printf("Precondicionador = %d\n", use_jacobi);
 
 	//Calculo do Residuo Inicial
 	calc_residuo(n, T, r);
@@ -228,7 +249,14 @@ int main(int argc, char **argv) {
 	do {
 		printf("Passo de Newton %d\n", newton_steps++);
 		calc_jacobiano(A, n, T);
+		//gsl_vector_fprintf(stdout, jacobi, "%e");
 
+		//Aplicar Precondicionador Jacobi
+		if(use_jacobi){
+			get_jacobi(A, jacobi);
+			apply_jacobi_mat(A, jacobi);
+			apply_jacobi_vec(r, jacobi);
+		}
 		//Resolucao de Sistema Linear
 		iter = 0;
 		do{
@@ -288,6 +316,7 @@ int main(int argc, char **argv) {
 	gsl_vector_free(T);
 	gsl_vector_free(r);	
 	gsl_vector_free(dx);	
+	gsl_vector_free(jacobi);
 	gsl_splinalg_itersolve_free(gmres_solver);
 
 }
