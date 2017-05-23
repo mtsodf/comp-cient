@@ -15,6 +15,14 @@ double k_interface(double T1, double T2) {
 	//return 1.0;
 }
 
+/*
+ * Calcula o valor da derivada de k na interface
+ */
+double dk_interface(double T1, double T2) {
+	return T1  + T2;
+	//return 0.0;
+}
+
 
 /**
  * Solucao analitica
@@ -194,6 +202,123 @@ void apply_jacobi_mat(gsl_spmatrix* A , gsl_vector* jacobi){
 void apply_jacobi_vec(gsl_vector* x , gsl_vector* jacobi){
 	for(int i = 0; i < x->size; i++){
 		x->data[i] *= gsl_vector_get(jacobi, i);
+	}
+}
+/**
+* Dada uma posicao no vetor solucao, recupera o valor desse ponto
+* e os valores dos nos vizinhos desse ponto na malha. Nos pontos proximos
+* a fronteira, recupera os valores correspondentes no contorno.
+*/
+void define_vizinhos(int idx, gsl_vector* T, int n, double* T_O, double* T_N,
+		double* T_S, double* T_E, double* T_W) {
+	double h = 1.0 / n;
+	int i = idx % (n - 1);
+	int j = idx / (n - 1);
+	double x = (i + 1) * h;
+	double y = (j + 1) * h;
+
+	int idx_N = i + (j - 1) * (n - 1);
+	int idx_S = i + (j + 1) * (n - 1);
+	int idx_E = i + 1 + j * (n - 1);
+	int idx_W = i - 1 + j * (n - 1);
+
+	*T_O = gsl_vector_get(T, idx);
+
+	if ((i == 0) & (j == 0)) {
+		*T_N = contorno(x, 0);
+		*T_S = gsl_vector_get(T, idx_S);
+		*T_E = gsl_vector_get(T, idx_E);
+		*T_W = contorno(0, y);
+	} else if ((i == n - 2) & (j == 0)) {
+		*T_N = contorno(x, 0);
+		*T_S = gsl_vector_get(T, idx_S);
+		*T_E = contorno(1, y);
+		*T_W = gsl_vector_get(T, idx_W);
+	} else if ((i == 0) & (j == n - 2)) {
+		*T_N = gsl_vector_get(T, idx_N);
+		*T_S = contorno(x, 1);
+		*T_E = gsl_vector_get(T, idx_E);
+		*T_W = contorno(0, y);
+	} else if ((i == n - 2) & (j == n - 2)) {
+		*T_N = gsl_vector_get(T, idx_N);
+		*T_S = contorno(x, 1);
+		*T_E = contorno(1, y);
+		*T_W = gsl_vector_get(T, idx_W);
+	} else if (i == 0) {
+		*T_N = gsl_vector_get(T, idx_N);
+		*T_S = gsl_vector_get(T, idx_S);
+		*T_E = gsl_vector_get(T, idx_E);
+		*T_W = contorno(0, y);
+	} else if (i == n - 2) {
+		*T_N = gsl_vector_get(T, idx_N);
+		*T_S = gsl_vector_get(T, idx_S);
+		*T_E = contorno(1, y);
+		*T_W = gsl_vector_get(T, idx_W);
+	} else if (j == 0) {
+		*T_N = contorno(x, 0);
+		*T_S = gsl_vector_get(T, idx_S);
+		*T_E = gsl_vector_get(T, idx_E);
+		*T_W = gsl_vector_get(T, idx_W);
+	} else if (j == n - 2) {
+		*T_N = gsl_vector_get(T, idx_N);
+		*T_S = contorno(x, 1);
+		*T_E = gsl_vector_get(T, idx_E);
+		*T_W = gsl_vector_get(T, idx_W);
+	} else {
+		*T_N = gsl_vector_get(T, idx_N);
+		*T_S = gsl_vector_get(T, idx_S);
+		*T_E = gsl_vector_get(T, idx_E);
+		*T_W = gsl_vector_get(T, idx_W);
+	}
+}
+
+void calc_jacobiano_analitico(gsl_spmatrix* A, int n, gsl_vector *T) {
+
+	int unknows = (n - 1) * (n - 1);
+
+	int i, j;
+
+	double h = 1.0 / n;
+
+	for (int linha = 0; linha < unknows; linha++) {
+		double T_N, T_S, T_E, T_W, T_O;
+		define_vizinhos(linha, T, n, &T_O, &T_N, &T_S, &T_E, &T_W);
+
+		i = linha % (n - 1);
+		j = linha / (n - 1);
+		int linha_N = i + (j - 1) * (n - 1);
+		int linha_S = i + (j + 1) * (n - 1);
+		int linha_E = i + 1 + j * (n - 1);
+		int linha_W = i - 1 + j * (n - 1);
+
+		double k_n = k_interface(T_N, T_O);
+		double k_s = k_interface(T_S, T_O);
+		double k_e = k_interface(T_E, T_O);
+		double k_w = k_interface(T_W, T_O);
+
+		double dk_n = dk_interface(T_N, T_O);
+		double dk_s = dk_interface(T_S, T_O);
+		double dk_e = dk_interface(T_E, T_O);
+		double dk_w = dk_interface(T_W, T_O);
+
+		double deriv = (T_N * dk_n + T_S * dk_s + T_E * dk_e + T_W * dk_w
+				- (dk_n + dk_s + dk_e + dk_w) * T_O - (k_n + k_s + k_e + k_w))
+				/ (h * h);
+
+		gsl_spmatrix_set(A, linha, linha, deriv);
+		if (i > 0)
+			gsl_spmatrix_set(A, linha, linha_W,
+					(k_w + dk_w * (T_W - T_O)) / (h * h));
+		if (i < n - 2)
+			gsl_spmatrix_set(A, linha, linha_E,
+					(k_e + dk_e * (T_E - T_O)) / (h * h));
+		if (j > 0)
+			gsl_spmatrix_set(A, linha, linha_N,
+					(k_n + dk_n * (T_N - T_O)) / (h * h));
+		if (j < n - 2)
+			gsl_spmatrix_set(A, linha, linha_S,
+					(k_s + dk_s * (T_S - T_O)) / (h * h));
+
 	}
 }
 
