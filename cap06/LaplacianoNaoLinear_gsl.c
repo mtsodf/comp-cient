@@ -6,28 +6,35 @@
 
 #define dT  0.0001
 
-/**
- * Comentários:
- *
- * - steppest descent tem convergencia mais lenta (maior numero de iteracoes)
- * - se inserir as condicoes de contorno na matriz, ela deixa de ser simetrica
- * - precondicionamento nao fez diferenca (no problema linear)
+
+
+/*
+ * Calcula o valor de k na interface
  */
+double k_interface(double T1, double T2) {
+	return ((1 + T1 * T1) + (1 + T2 * T2)) / 2;
+	//return 1.0;
+}
+
 
 /**
  * Solucao analitica
  */
 double u(double x, double y) {
 	//return exp(x) + exp(y);
-	return sin(M_PI * x) * sin(M_PI * y);
+	return x + y;
 }
 
 double ld(double x, double y) {
-	//return exp(x) + exp(y);
-	return -2.0 * M_PI * M_PI * sin(M_PI * x) * sin(M_PI * y);
+	//return exp(x) + exp(y);	
+	return 4*(x+y);
 }
 
-void calc_sol(int n, double *sol) {
+double contorno(double x, double y) {
+	return u(x,y);
+}
+
+void calc_sol(int n, gsl_vector *sol) {
 	double h = 1.0 / n;
 	int ind = 0;
 	double x, y;
@@ -36,23 +43,10 @@ void calc_sol(int n, double *sol) {
 		y = (j + 1) * h;
 		for (int i = 0; i < n - 1; ++i) {
 			x = (i + 1) * h;
-			sol[ind] = u(x, y);
-
+			gsl_vector_set(sol, ind, u(x, y));
 			ind++;
 		}
 	}
-}
-
-/*
- * Calcula o valor de k na interface
- */
-double k_interface(double T1, double T2) {
-	//return ((1 + T1 * T1) + (1 + T2 * T2)) / 2;
-	return 1.0;
-}
-
-double contorno(double x, double y) {
-	return 0.0;
 }
 
 double residuo(int n, gsl_vector *T, int i, int j) {
@@ -66,6 +60,9 @@ double residuo(int n, gsl_vector *T, int i, int j) {
 	double x, y;
 
 	double h = 1.0 / n; //distancia dos pontos
+
+	x = (i+1)*h;
+	y = (j+1)*h;
 
 	ind = i + (n - 1) * j;
 	Tij = gsl_vector_get(T, ind);
@@ -118,6 +115,8 @@ double residuo(int n, gsl_vector *T, int i, int j) {
 
 	r /= h * h;
 
+	r -= ld(x,y);
+
 	return r;
 }
 
@@ -137,7 +136,7 @@ double d_residuo(int n, gsl_vector *T, int i, int j, int ind) {
 
 }
 
-void calc_residuo(int n, gsl_vector *T, double *r) {
+void calc_residuo(int n, gsl_vector *T, gsl_vector *r) {
 	int unknows = (n - 1) * (n - 1); //numero de variaveis
 
 	double x, y;
@@ -148,7 +147,7 @@ void calc_residuo(int n, gsl_vector *T, double *r) {
 		for (int i = 0; i < n - 1; i++) {
 			{
 				ind = i + (n - 1) * j;
-				r[ind] = residuo(n, T, i, j);
+				gsl_vector_set(r, ind, residuo(n, T, i, j));
 			}
 		}
 
@@ -179,6 +178,16 @@ void calc_jacobiano(gsl_spmatrix* A, int n, gsl_vector *T) {
 	}
 }
 
+void printVecFile(int n, gsl_vector *v, FILE* f) {
+	for (int i = 0; i < n; ++i) {
+		fprintf(f, "%8.3lf", gsl_vector_get(v, i));
+	}
+
+	fprintf(f, "\n");
+}
+
+
+
 int main(int argc, char **argv) {
 
 	int n = atoi(argv[1]);
@@ -186,15 +195,92 @@ int main(int argc, char **argv) {
 	printf("n = %d \n", n);
 
 	int unknows = (n - 1) * (n - 1);
+	int status, iter, newton_steps = 0;
+	const double tol = 1.0e-6; /* solution relative tolerance */
+	const size_t max_iter = 100; /* maximum iterations */
+	const gsl_splinalg_itersolve_type *Solver = gsl_splinalg_itersolve_gmres;
+	double rnorm;
+	gsl_splinalg_itersolve *gmres_solver = gsl_splinalg_itersolve_alloc(Solver, unknows, 0);
+
+
+
 	gsl_vector* T = gsl_vector_alloc(unknows);
 	for (int i = 0; i < unknows; ++i) {
-		gsl_vector_set(T, i, i);
+		gsl_vector_set(T, i, 0);
 	}
 
-	gsl_spmatrix* A = gsl_spmatrix_alloc_nzmax(unknows, unknows, 5 * unknows,
-	GSL_SPMATRIX_TRIPLET);
-	calc_jacobiano(A, n, T);
+	gsl_vector* r = gsl_vector_alloc(unknows);
 
-	gsl_spmatrix_fprintf(stdout, A, "%5.3f");
+	gsl_spmatrix* A = gsl_spmatrix_alloc_nzmax(unknows, unknows, 5 * unknows, GSL_SPMATRIX_TRIPLET);
+
+	gsl_vector* dx = gsl_vector_alloc(unknows);
+
+	gsl_vector_set_zero (dx);
+
+	calc_residuo(n, T, r);
+	gsl_blas_dscal (-1.0, r);
+	//gsl_vector_fprintf (stdout, r, "%.5lf");
+
+	rnorm = gsl_blas_dnrm2(r);
+	printf("Residuo Inicial = %lf\n\n", rnorm);
+	
+	do {
+		printf("Passo de Newton %d\n", newton_steps++);
+		iter = 0;
+		do{
+			calc_jacobiano(A, n, T);
+			status = gsl_splinalg_itersolve_iterate(A, r, tol, dx, gmres_solver);
+		}while(status == GSL_CONTINUE && ++iter < max_iter);
+
+		rnorm = gsl_splinalg_itersolve_normr(gmres_solver);
+		printf("\tIteracoes Lineares = %d\n", iter);
+
+		gsl_blas_daxpy(1.0, dx, T);
+
+		calc_residuo(n, T, r);
+		gsl_blas_dscal (-1.0, r);
+		rnorm = gsl_blas_dnrm2(r);
+
+		printf("\trnorm = %lf\n\n", rnorm);
+	} while(rnorm>1e-6);
+
+	FILE* saida = fopen("saida.txt", "w");
+
+	fprintf(saida, "n = %d\n", n);
+
+	fprintf(saida, "\nSolucao Encontrada\n");
+	for (int i = 0; i < n - 1; ++i) {
+		for (int j = 0; j < n - 1; ++j){
+			fprintf(saida, "%8.3f", gsl_vector_get (T, i+j*(n-1)));
+		}
+		fprintf(saida, "\n");
+	}
+
+	gsl_vector * sol = gsl_vector_alloc(unknows);
+	calc_sol(n, sol);
+
+	fprintf(saida, "\nSolucao Real\n");
+	for (int i = 0; i < n - 1; ++i) {
+		for (int j = 0; j < n - 1; ++j){
+			fprintf(saida, "%8.3f", gsl_vector_get (sol, i+j*(n-1)));
+		}
+		fprintf(saida, "\n");
+	}	
+
+	gsl_blas_daxpy(-1.0, T, sol);
+
+	double difsol = gsl_blas_dnrm2(sol);
+
+	fprintf(saida, "\n\tNorma Residuo = %e\n", difsol);
+	printf("\n\tNorma Residuo = %e\n", difsol);
+
+	fclose(saida);
+
+	gsl_vector_free(sol);
+
+	gsl_vector_free(T);
+	gsl_vector_free(r);	
+	gsl_vector_free(dx);	
+	gsl_splinalg_itersolve_free(gmres_solver);
 
 }
