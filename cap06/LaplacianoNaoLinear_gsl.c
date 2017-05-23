@@ -178,72 +178,79 @@ void calc_jacobiano(gsl_spmatrix* A, int n, gsl_vector *T) {
 	}
 }
 
-void printVecFile(int n, gsl_vector *v, FILE* f) {
-	for (int i = 0; i < n; ++i) {
-		fprintf(f, "%8.3lf", gsl_vector_get(v, i));
-	}
-
-	fprintf(f, "\n");
-}
 
 
 
 int main(int argc, char **argv) {
 
 	int n = atoi(argv[1]);
-	printf("%s\n", argv[1]);
 	printf("n = %d \n", n);
+
+
 
 	int unknows = (n - 1) * (n - 1);
 	int status, iter, newton_steps = 0;
-	const double tol = 1.0e-6; /* solution relative tolerance */
-	const size_t max_iter = 1000; /* maximum iterations */
+	double tol_linear = 1.0e-6; /* solution relative tolerance linear solver */
+	size_t max_iter = 1000;     /* maximum iterations */
+	double tol_newton = 1e-4;
 	const gsl_splinalg_itersolve_type *Solver = gsl_splinalg_itersolve_gmres;
 	double rnorm;
 	gsl_splinalg_itersolve *gmres_solver = gsl_splinalg_itersolve_alloc(Solver, unknows, 0);
 
-
+	if(argc > 2){
+		tol_newton = atof(argv[2]);
+		tol_linear = atof(argv[3]);
+	}
 
 	gsl_vector* T = gsl_vector_alloc(unknows);
 	for (int i = 0; i < unknows; ++i) {
 		gsl_vector_set(T, i, 0);
 	}
 
-	gsl_vector* r = gsl_vector_alloc(unknows);
-
 	gsl_spmatrix* A = gsl_spmatrix_alloc_nzmax(unknows, unknows, 5 * unknows, GSL_SPMATRIX_TRIPLET);
 
+	//Alocando Vetores
+	gsl_vector* r = gsl_vector_alloc(unknows);
 	gsl_vector* dx = gsl_vector_alloc(unknows);
-
 	gsl_vector_set_zero (dx);
 
+	printf("Toleracia Newton = %e\n", tol_newton);
+	printf("Toleracia Linear = %e\n", tol_linear);
+
+
+	//Calculo do Residuo Inicial
 	calc_residuo(n, T, r);
 	gsl_blas_dscal (-1.0, r);
-	//gsl_vector_fprintf (stdout, r, "%.5lf");
-
 	rnorm = gsl_blas_dnrm2(r);
 	printf("Residuo Inicial = %lf\n\n", rnorm);
 
+	//Metodo de Newton
 	do {
 		printf("Passo de Newton %d\n", newton_steps++);
+		calc_jacobiano(A, n, T);
+
+		//Resolucao de Sistema Linear
 		iter = 0;
 		do{
-			calc_jacobiano(A, n, T);
-			status = gsl_splinalg_itersolve_iterate(A, r, tol, dx, gmres_solver);
+			status = gsl_splinalg_itersolve_iterate(A, r, tol_linear, dx, gmres_solver);
 		}while(status == GSL_CONTINUE && ++iter < max_iter);
 
 		rnorm = gsl_splinalg_itersolve_normr(gmres_solver);
-		printf("\tIteracoes Lineares = %d\n", iter);
+		printf("\tIteracoes Lineares = %d\n\trnorm_linear = %lf\n", iter, rnorm);
 
+		//Atualizacao de T
 		gsl_blas_daxpy(1.0, dx, T);
 
 		calc_residuo(n, T, r);
 		gsl_blas_dscal (-1.0, r);
 		rnorm = gsl_blas_dnrm2(r);
 
-		printf("\trnorm = %lf\n\n", rnorm);
-	} while(rnorm>1e-6);
+		printf("\trnorm_newton = %lf\n\n", rnorm);
+	} while(rnorm>tol_newton);
 
+	printf("Fim do Método de Newton\n");
+
+	//Escrita da solucao e do arquivo de saida 
 	FILE* saida = fopen("saida.txt", "w");
 
 	fprintf(saida, "n = %d\n", n);
@@ -267,17 +274,17 @@ int main(int argc, char **argv) {
 		fprintf(saida, "\n");
 	}	
 
+
 	gsl_blas_daxpy(-1.0, T, sol);
 
 	double difsol = gsl_blas_dnrm2(sol);
 
 	fprintf(saida, "\n\tNorma Residuo = %e\n", difsol);
-	printf("\n\tNorma Residuo = %e\n", difsol);
+	printf("\nNorma Residuo = %e\n", difsol);
 
 	fclose(saida);
 
 	gsl_vector_free(sol);
-
 	gsl_vector_free(T);
 	gsl_vector_free(r);	
 	gsl_vector_free(dx);	
