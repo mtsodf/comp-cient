@@ -197,7 +197,7 @@ int main(int argc, char **argv) {
 	int unknows = (n - 1) * (n - 1);
 	int status, iter, newton_steps = 0;
 	const double tol = 1.0e-6; /* solution relative tolerance */
-	const size_t max_iter = 100; /* maximum iterations */
+	const size_t max_iter = 1000; /* maximum iterations */
 	const gsl_splinalg_itersolve_type *Solver = gsl_splinalg_itersolve_gmres;
 	double rnorm;
 	gsl_splinalg_itersolve *gmres_solver = gsl_splinalg_itersolve_alloc(Solver, unknows, 0);
@@ -223,7 +223,7 @@ int main(int argc, char **argv) {
 
 	rnorm = gsl_blas_dnrm2(r);
 	printf("Residuo Inicial = %lf\n\n", rnorm);
-	
+
 	do {
 		printf("Passo de Newton %d\n", newton_steps++);
 		iter = 0;
