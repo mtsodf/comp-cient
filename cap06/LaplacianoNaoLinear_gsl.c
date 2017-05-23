@@ -326,7 +326,7 @@ void calc_jacobiano_analitico(gsl_spmatrix* A, int n, gsl_vector *T) {
 int main(int argc, char **argv) {
 
 	int n = atoi(argv[1]);
-	printf("n = %d \n", n);
+	
 
 	int unknows = (n - 1) * (n - 1);
 	int status, iter, newton_steps = 0;
@@ -359,16 +359,20 @@ int main(int argc, char **argv) {
 	gsl_vector* dx = gsl_vector_alloc(unknows);
 	gsl_vector* jacobi = gsl_vector_alloc(unknows);
 	gsl_vector_set_zero (dx);
-
+	printf("*************************************************************************\n");
+	printf("n = %d \n", n);
 	printf("Toleracia Newton = %e\n", tol_newton);
 	printf("Toleracia Linear = %e\n", tol_linear);
 	printf("Precondicionador = %d\n", use_jacobi);
+	printf("Qtd de Variaveis = %d\n", unknows);
 
 	//Calculo do Residuo Inicial
 	calc_residuo(n, T, r);
 	gsl_blas_dscal (-1.0, r);
 	rnorm = gsl_blas_dnrm2(r);
 	printf("Residuo Inicial = %lf\n\n", rnorm);
+	printf("*************************************************************************\n");
+
 
 	//Metodo de Newton
 	do {
@@ -389,7 +393,7 @@ int main(int argc, char **argv) {
 		}while(status == GSL_CONTINUE && ++iter < max_iter);
 
 		rnorm = gsl_splinalg_itersolve_normr(gmres_solver);
-		printf("\tIteracoes Lineares = %d\n\trnorm_linear = %lf\n", iter, rnorm);
+		printf("\tIteracoes Lineares = %d\n\trnorm_linear = %e\n", iter, rnorm);
 
 		//Atualizacao de T
 		gsl_blas_daxpy(1.0, dx, T);
@@ -398,7 +402,7 @@ int main(int argc, char **argv) {
 		gsl_blas_dscal (-1.0, r);
 		rnorm = gsl_blas_dnrm2(r);
 
-		printf("\trnorm_newton = %lf\n\n", rnorm);
+		printf("\trnorm_newton = %e\n\n", rnorm);
 	} while(rnorm>tol_newton);
 
 	printf("Fim do Método de Newton\n");
@@ -430,7 +434,7 @@ int main(int argc, char **argv) {
 
 	gsl_blas_daxpy(-1.0, T, sol);
 
-	double difsol = gsl_blas_dnrm2(sol);
+	double difsol = gsl_blas_dnrm2(sol)/unknows;
 
 	fprintf(saida, "\n\tNorma Residuo = %e\n", difsol);
 	printf("\nNorma Residuo = %e\n", difsol);
