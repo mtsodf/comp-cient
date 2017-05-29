@@ -42,14 +42,20 @@ void printVecFile(int n, double *v, FILE* f) {
  * Solucao analitica
  */
 double u_sol(double x, double y, double t) {
+	return 0.0;
 	return 20*x * (1 - x) * y * (1 - y) * exp(-t);
+
 }
 
 double contorno(double x, double y, double t) {
+	if(y>=1){
+		return 1.0;
+	}
 	return 0.0;
 }
 
 double ld(double x, double y, double t) {
+	return 0.0;
 	double aux = -2 * (1 - x) * x * exp(-t) - 2 * (1 - y) * y * exp(-t)
 			 + (1 - x) * x * (1 - y) * y * exp(-t);
 	return 20*aux;
@@ -270,6 +276,11 @@ int main(int argc, char **argv) {
 		dt = atof(argv[2]);
 	}
 
+	int maxiters = 10;
+	if(argc > 3){
+		maxiters = atoi(argv[3]);
+	}	
+
 	//condicao inicial
 	calc_sol(n, u0, 0);
 
@@ -280,16 +291,16 @@ int main(int argc, char **argv) {
 	fprintf(saida, "%d\n", n);
 
 
-	for (int iter = 0; iter < 1000; iter++) {
+	for (int iter = 0; iter < maxiters; iter++) {
 
 		printf("t = %lf\n", t+dt);
 		fprintf(saida, "%lf\n", t+dt);
-		metodo_implicito(t, dt, u0, n);
+		//metodo_implicito(t, dt, u0, n);
 
-		//metodo_explicito(t, dt, u0, u, n);
-		//aux = u0;
-		//u0 = u;
-		//u = aux;
+		metodo_explicito(t, dt, u0, u, n);
+		aux = u0;
+		u0 = u;
+		u = aux;
 
 		t += dt;
 		calc_sol(n, u, t);
