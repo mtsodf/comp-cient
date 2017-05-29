@@ -17,7 +17,7 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import numpy as np
 import math
 
-def plotar_tempo(ax, t, n):
+def plot_analitica(ax, t, n):
 
 
     # Make data.
@@ -38,12 +38,7 @@ def plotar_tempo(ax, t, n):
     ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
 
 
-
-def plot_3d(Z, n, t):
-
-    fig = plt.figure(figsize=plt.figaspect(2.))
-    fig.suptitle('t = %f' % t)
-    ax = fig.add_subplot(2, 1, 1, projection='3d')
+def plot_calculada(ax, Z, n):
     ax.set_title('Calculada')
 
     # Make data.
@@ -62,15 +57,24 @@ def plot_3d(Z, n, t):
     ax.zaxis.set_major_locator(LinearLocator(10))
     ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
 
+
+def plot_3d(Z, n, t):
+
+    fig = plt.figure(figsize=plt.figaspect(2.))
+    fig.suptitle('t = %f' % t)
+
+    ax = fig.add_subplot(2, 1, 1, projection='3d')
+    plot_calculada(ax, Z, n)
+
     ax = fig.add_subplot(2, 1, 2, projection='3d')
-    plotar_tempo(ax, t, n)
+    plot_analitica(ax, t, n)
 
-
-
-    fig.savefig('./solucao/t_%4.2f.png'%t)   # save the figure to file
+    file = './solucao/t_%4.2f.png'%t
+    fig.savefig(file)   # save the figure to file
 
     plt.close(fig)
 
+    return file
 
 def read_saida():
     f = open("saida.txt")
@@ -100,11 +104,11 @@ def read_saida():
     print "qtd = ", len(valores[tempos[0]])
     print n
 
-    for t in tempos[:20]:
+    arquivos = []
+
+    for t in tempos:
         plot_3d(valores[t], n, t)
-        #plotar_tempo(t,n)
+
 
 
 read_saida()
-
-#plotar_tempo(0.0)
