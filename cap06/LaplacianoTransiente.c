@@ -51,7 +51,7 @@ double contorno(double x, double y, double t) {
 
 double ld(double x, double y, double t) {
 	double aux = -2 * (1 - x) * x * exp(-t) - 2 * (1 - y) * y * exp(-t)
-			- (1 - x) * x * (1 - y) * y * exp(-t);
+			 + (1 - x) * x * (1 - y) * y * exp(-t);
 	return 20*aux;
 }
 
@@ -100,7 +100,7 @@ void metodo_implicito(double t, double dt, double* u0, int n) {
 	b = (double*) malloc(sizeof(double) * unknows);
 
 	for (int i = 0; i < (unknows); ++i)
-		A.val[0][i] = -4 / (h * h) + 1/dt;
+		A.val[0][i] = -4 / (h * h) - 1/dt;
 	for (int i = 0; i < (unknows - 1); ++i) {
 		if (i % (n - 1) == n - 2) {
 			A.val[1][i] = 0.0;
@@ -121,7 +121,7 @@ void metodo_implicito(double t, double dt, double* u0, int n) {
 
 			int ind = j * (n - 1) + i;
 
-			b[ind] = ld(x, y, t) + u0[ind]/dt;
+			b[ind] = ld(x, y, t) - u0[ind]/dt;
 		}
 	}
 
@@ -181,25 +181,22 @@ void define_vizinhos(double t, int idx, double* T, int n, double* T_O,
 
 	*T_O = T[idx];
 
-	if ((idx_N == i + (n - 1) * (n - 1)) | (idx_N == (n - 1) * (n - 1))
-			| (idx_N == n - 2 + (n - 1) * (n - 1)))
+	if (j == n - 2)
 		*T_N = contorno(x, 1, t);
 	else
 		*T_N = T[idx_N];
 
-	if ((idx_S == i - (n - 1)) | (idx_S == -1) | (idx_S == -(n - 1)))
+	if (j == 0)
 		*T_S = contorno(x, 0, t);
 	else
 		*T_S = T[idx_S];
 
-	if ((idx_E == (j + 1) * (n - 1)) | (idx_E == (n - 1) * (n - 1))
-			| (idx_E == n - 1))
+	if (i == n-2)
 		*T_E = contorno(1, y, t);
 	else
 		*T_E = T[idx_E];
 
-	if ((idx_W == -1 + j * (n - 1)) | (idx_W == -1 + (n - 2) * (n - 1))
-			| (idx_W == -1))
+	if (i == 0)
 		*T_W = contorno(0, y, t);
 	else
 		*T_W = T[idx_W];
@@ -219,9 +216,9 @@ void metodo_explicito(double t, double dt, double* u0, double* u, int n) {
 		//laplaciano
 		double u_C, u_N, u_S, u_E, u_W;
 		define_vizinhos(t, ind, u0, n, &u_C, &u_N, &u_S, &u_E, &u_W);
-		double lapl = (u_W - 2 * u_C + u_E) / (2 * h)
-				+ (u_N - 2 * u_C + u_S) / (2 * h);
-		u[ind] = (-lapl + ld(x, y, t)) * dt + u_C;
+		double lapl = (u_W - 2 * u_C + u_E) / (h * h)
+				+ (u_N - 2 * u_C + u_S) / (h * h);
+		u[ind] = (lapl - ld(x, y, t)) * dt + u_C;
 	}
 }
 
@@ -256,6 +253,7 @@ int main(int argc, char **argv) {
 	printf("%s\n", argv[1]);
 	printf("n = %d \n", n);
 
+	int metodo = 0; double *aux;
 
 
 	int unknowns = (n - 1) * (n - 1);
@@ -282,21 +280,22 @@ int main(int argc, char **argv) {
 	fprintf(saida, "%d\n", n);
 
 
-	for (int iter = 0; iter < 30; iter++) {
-		//metodo_explicito(t, dt, u0, u, n);
+	for (int iter = 0; iter < 1000; iter++) {
 
-		//memcpy(u, u0, sizeof(double) * unknowns);
-		//metodo_explicito(t, dt, u0, u, n);
 		printf("t = %lf\n", t+dt);
 		fprintf(saida, "%lf\n", t+dt);
 		metodo_implicito(t, dt, u0, n);
+
+		//metodo_explicito(t, dt, u0, u, n);
+		//aux = u0;
+		//u0 = u;
+		//u = aux;
 
 		t += dt;
 		calc_sol(n, u, t);
 		comparar_sol_analitica(unknowns, u0, u);
 		printSolucao(saida, n, u0);
 
-		//memcpy(u, u0, sizeof(double) * unknowns);
 	}
 
 	fclose(saida);
