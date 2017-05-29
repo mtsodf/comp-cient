@@ -16,6 +16,8 @@ from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import numpy as np
 import math
+import os
+import glob
 
 def plot_analitica(ax, t, n):
 
@@ -69,7 +71,7 @@ def plot_3d(Z, n, t):
     ax = fig.add_subplot(2, 1, 2, projection='3d')
     plot_analitica(ax, t, n)
 
-    file = './solucao/t_%4.2f.png'%t
+    file = './solucao/t_%5.3f.png'%t
     fig.savefig(file)   # save the figure to file
 
     plt.close(fig)
@@ -109,6 +111,7 @@ def read_saida():
     for t in tempos:
         plot_3d(valores[t], n, t)
 
-
-
+files = glob.glob("./solucao/*")
+for f in files:
+    os.remove(f)
 read_saida()
