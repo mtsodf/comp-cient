@@ -42,8 +42,7 @@ void printVecFile(int n, double *v, FILE* f) {
  * Solucao analitica
  */
 double u_sol(double x, double y, double t) {
-	//return 1.0;
-	return x * (1 - x) * y * (1 - y) * exp(-t);
+	return 20*x * (1 - x) * y * (1 - y) * exp(-t);
 }
 
 double contorno(double x, double y, double t) {
@@ -51,9 +50,9 @@ double contorno(double x, double y, double t) {
 }
 
 double ld(double x, double y, double t) {
-	return 0.0;
-	return -2 * (1 - x) * x * exp(-t) - 2 * (1 - y) * y * exp(-t)
+	double aux = -2 * (1 - x) * x * exp(-t) - 2 * (1 - y) * y * exp(-t)
 			- (1 - x) * x * (1 - y) * y * exp(-t);
+	return 20*aux;
 }
 
 void calc_sol(int n, double *sol, double t) {
@@ -96,11 +95,12 @@ void metodo_implicito(double t, double dt, double* u0, int n) {
 
 	double * b;
 
+	t += dt;
+
 	b = (double*) malloc(sizeof(double) * unknows);
 
 	for (int i = 0; i < (unknows); ++i)
-		A.val[0][i] = -4 / (h * h) + 1 / dt;
-
+		A.val[0][i] = -4 / (h * h) + 1/dt;
 	for (int i = 0; i < (unknows - 1); ++i) {
 		if (i % (n - 1) == n - 2) {
 			A.val[1][i] = 0.0;
@@ -121,7 +121,7 @@ void metodo_implicito(double t, double dt, double* u0, int n) {
 
 			int ind = j * (n - 1) + i;
 
-			b[ind] = ld(x, y, t) + u0[ind] / dt;
+			b[ind] = ld(x, y, t) + u0[ind]/dt;
 		}
 	}
 
@@ -159,21 +159,10 @@ void metodo_implicito(double t, double dt, double* u0, int n) {
 
 	}
 
-//	printf("T antes = \n");
-//	printVec(unknows, u0);
-//	printf("b antes = \n");
-//	printVec(unknows, b);
 
 	cg(A, b, u0, &rnorm);
 
-//	printf("A = \n");
-//	printMatriz(A);
-//	printf("T depois = \n");
-//	printVec(unknows, u0);
-//	printf("b depois = \n");
-//	printVec(unknows, b);
-
-	printf("Norma CG = %e\n", rnorm);
+	printf("\tNorma CG = %e\n", rnorm);
 
 }
 
@@ -239,7 +228,7 @@ void metodo_explicito(double t, double dt, double* u0, double* u, int n) {
 void comparar_sol_analitica(int unknowns, double* u, double* sol) {
 	cblas_daxpy(unknowns, -1.0, u, 1, sol, 1);
 	double norm = cblas_dnrm2(unknowns, sol, 1);
-	printf("Norma de (u - sol) = %f \n", norm);
+	printf("\tNorma de |u - sol| = %e \n", norm);
 }
 
 void printMatriz(matriz A) {
@@ -249,11 +238,25 @@ void printMatriz(matriz A) {
 	}
 }
 
+void printSolucao(FILE* saida, int n, double* sol){
+	int N = n - 1;
+	int ind = 0;
+	for (int j = 0; j < n - 1; ++j) {
+		for (int i = 0; i < n - 1; ++i) {
+			fprintf(saida, "%f ", sol[ind++]);
+		}
+		fprintf(saida, "\n");
+	}
+
+}
+
 int main(int argc, char **argv) {
 
 	int n = atoi(argv[1]);
 	printf("%s\n", argv[1]);
 	printf("n = %d \n", n);
+
+
 
 	int unknowns = (n - 1) * (n - 1);
 
@@ -261,24 +264,42 @@ int main(int argc, char **argv) {
 	double* u = (double*) malloc(sizeof(double) * unknowns);
 	double* sol = (double*) malloc(sizeof(double) * unknowns);
 
+	//loop do metodo explicito
+	double dt = 0.01;
+	double t = 0;
+
+	if(argc > 2){
+		dt = atof(argv[2]);
+	}
+
 	//condicao inicial
 	calc_sol(n, u0, 0);
 
-	//loop do metodo explicito
-	double dt = 0.1;
-	double t = 0;
-	for (int iter = 0; iter < 10; iter++) {
-		metodo_explicito(t, dt, u0, u, n);
+	FILE* saida;
+
+	saida = fopen("saida.txt", "w");
+
+	fprintf(saida, "%d\n", n);
+
+
+	for (int iter = 0; iter < 30; iter++) {
+		//metodo_explicito(t, dt, u0, u, n);
 
 		//memcpy(u, u0, sizeof(double) * unknowns);
-		//metodo_implicito(t, dt, u0, n);
+		//metodo_explicito(t, dt, u0, u, n);
+		printf("t = %lf\n", t+dt);
+		fprintf(saida, "%lf\n", t+dt);
+		metodo_implicito(t, dt, u0, n);
 
 		t += dt;
-		comparar_sol_analitica(unknowns, u, u0);
-		memcpy(u0, u, sizeof(double) * unknowns);
+		calc_sol(n, u, t);
+		comparar_sol_analitica(unknowns, u0, u);
+		printSolucao(saida, n, u0);
 
 		//memcpy(u, u0, sizeof(double) * unknowns);
 	}
+
+	fclose(saida);
 
 	//laplace(n);
 }
