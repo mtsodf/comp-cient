@@ -48,7 +48,7 @@ double u_sol(double x, double y, double t) {
 }
 
 double contorno(double x, double y, double t) {
-	if(y>=1){
+	if(y>=1 || x<=0){
 		return 1.0;
 	}
 	return 0.0;
@@ -77,47 +77,56 @@ void calc_sol(int n, double *sol, double t) {
 	}
 }
 
-void metodo_implicito(double t, double dt, double* u0, int n) {
 
-	double h = 1.0 / n;
-
-	double rnorm;
-
+void montar_matriz(double dt, int n, matriz *A){
 	int unknows = (n - 1) * (n - 1);
-
-	matriz A;
+	double h  = 1.0/n;
 
 	//Alocando Matriz do Laplaciano
-	A.val = (double**) malloc(sizeof(double*) * 3);
-	A.val[0] = (double *) malloc(sizeof(double) * unknows);
-	A.val[1] = (double *) malloc(sizeof(double) * (unknows - 1));
-	A.val[2] = (double *) malloc(sizeof(double) * (unknows - n + 1));
-	A.desloc = (int *) malloc(sizeof(int) * (3));
-	A.desloc[0] = 0;
-	A.desloc[1] = 1;
-	A.desloc[2] = n - 1;
-	A.nd = 3;
-	A.n = unknows;
-
-	double * b;
-
-	t += dt;
-
-	b = (double*) malloc(sizeof(double) * unknows);
+	A->val = (double**) malloc(sizeof(double*) * 3);
+	A->val[0] = (double *) malloc(sizeof(double) * unknows);
+	A->val[1] = (double *) malloc(sizeof(double) * (unknows - 1));
+	A->val[2] = (double *) malloc(sizeof(double) * (unknows - n + 1));
+	A->desloc = (int *) malloc(sizeof(int) * (3));
+	A->desloc[0] = 0;
+	A->desloc[1] = 1;
+	A->desloc[2] = n - 1;
+	A->nd = 3;
+	A->n = unknows;
 
 	for (int i = 0; i < (unknows); ++i)
-		A.val[0][i] = -4 / (h * h) - 1/dt;
+		A->val[0][i] = -4 / (h * h) - 1/dt;
 	for (int i = 0; i < (unknows - 1); ++i) {
 		if (i % (n - 1) == n - 2) {
-			A.val[1][i] = 0.0;
+			A->val[1][i] = 0.0;
 		} else {
-			A.val[1][i] = 1 / (h * h);
+			A->val[1][i] = 1 / (h * h);
 		}
 
 	}
 
 	for (int i = 0; i < (unknows - n + 1); ++i)
-		A.val[2][i] = 1 / (h * h);
+		A->val[2][i] = 1 / (h * h);
+
+
+
+}
+
+
+void metodo_implicito(double t, double dt, matriz *A, double* u0, int n) {
+
+	double h = 1.0 / n;
+
+	double rnorm;
+
+	double * b;
+
+	int unknows = (n - 1) * (n - 1);
+
+	t += dt;
+
+	b = (double*) malloc(sizeof(double) * unknows);
+
 
 	// Criando lado direito
 	for (int j = 0; j < n - 1; ++j) {
@@ -166,7 +175,7 @@ void metodo_implicito(double t, double dt, double* u0, int n) {
 	}
 
 
-	cg(A, b, u0, &rnorm);
+	cg(*A, b, u0, &rnorm);
 
 	printf("\tNorma CG = %e\n", rnorm);
 
@@ -250,7 +259,6 @@ void printSolucao(FILE* saida, int n, double* sol){
 		}
 		fprintf(saida, "\n");
 	}
-
 }
 
 int main(int argc, char **argv) {
@@ -291,16 +299,21 @@ int main(int argc, char **argv) {
 	fprintf(saida, "%d\n", n);
 
 
+	fprintf(saida, "%lf\n", t);
+	printSolucao(saida, n, u0);
+
+	matriz A;
+	montar_matriz(dt, n, &A);
 	for (int iter = 0; iter < maxiters; iter++) {
 
 		printf("t = %lf\n", t+dt);
 		fprintf(saida, "%lf\n", t+dt);
-		//metodo_implicito(t, dt, u0, n);
+		metodo_implicito(t, dt, &A, u0, n);
 
-		metodo_explicito(t, dt, u0, u, n);
-		aux = u0;
-		u0 = u;
-		u = aux;
+		//metodo_explicito(t, dt, u0, u, n);
+		//aux = u0;
+		//u0 = u;
+		//u = aux;
 
 		t += dt;
 		calc_sol(n, u, t);
