@@ -54,6 +54,8 @@ def plot_calculada(ax, Z, n):
     surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
                            linewidth=0, antialiased=False)
 
+    #ax.imshow(Z, interpolation="gaussian", cmap='viridis', extent=[0,1,0,1])
+
     # Customize the z axis.
     ax.set_zlim(0.0, 1.01)
     ax.zaxis.set_major_locator(LinearLocator(10))
@@ -62,13 +64,13 @@ def plot_calculada(ax, Z, n):
 
 def plot_3d(Z, n, t):
 
-    fig = plt.figure(figsize=plt.figaspect(2.))
+    fig = plt.figure(figsize=plt.figaspect(.5))
     fig.suptitle('t = %f' % t)
 
-    ax = fig.add_subplot(2, 1, 1, projection='3d')
+    ax = fig.add_subplot(1, 2, 1, projection='3d')
     plot_calculada(ax, Z, n)
 
-    ax = fig.add_subplot(2, 1, 2, projection='3d')
+    ax = fig.add_subplot(1, 2, 2, projection='3d')
     plot_analitica(ax, t, n)
 
     file = './solucao/t_%5.3f.png'%t
@@ -78,7 +80,33 @@ def plot_3d(Z, n, t):
 
     return file
 
-def read_saida():
+def plot_map(Z, n, t):
+
+    fig = plt.figure(figsize=plt.figaspect(.5))
+    fig.suptitle('t = %f' % t)
+
+    ax = fig.add_subplot(1, 1, 1)
+
+    X = np.arange(1.0/n, 1.0, 1.0/n)
+    Y = np.arange(1.0/n, 1.0, 1.0/n)
+    X, Y = np.meshgrid(X, Y)
+    Z=Z[::-1]
+    Z = np.reshape(Z, (n-1,n-1))
+
+    im = ax.imshow(Z, interpolation="gaussian", cmap='seismic', extent=[0,1,0,1], vmin=0, vmax=1)
+
+    fig.colorbar(im)
+    file = './solucao/map_t_%5.3f.png'%t
+    fig.savefig(file)   # save the figure to file
+
+
+
+    plt.close(fig)
+
+    return file
+
+
+def read_saida(jump):
     f = open("saida.txt")
 
     n = 0;
@@ -108,10 +136,21 @@ def read_saida():
 
     arquivos = []
 
-    for t in tempos:
+    for t in tempos[::jump]:
         plot_3d(valores[t], n, t)
+        plot_map(valores[t], n, t)
 
 files = glob.glob("./solucao/*")
 for f in files:
     os.remove(f)
-read_saida()
+
+
+
+import sys
+
+if len(sys.argv) > 2:
+    n = int(sys.argv[1])
+else:
+    n = 1
+
+read_saida(1)
