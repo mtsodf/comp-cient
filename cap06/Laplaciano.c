@@ -34,13 +34,22 @@ void printVecFile(int n, double *v, FILE* f) {
  * Solucao analitica
  */
 double u(double x, double y) {
-	//return exp(x) + exp(y);
-	return sin(M_PI * x) * sin(M_PI * y);
+	return exp(x) + exp(y);
+	//return sin(M_PI * x) * sin(M_PI * y);
+}
+
+double contorno(double x, double y){
+	//return u(x,y);
+	if(y>=1 || x<=0){
+		return 1.0;
+	}
+	return 0.0;
 }
 
 double ld(double x, double y) {
-	//return exp(x) + exp(y);
-	return -2.0 * M_PI * M_PI * sin(M_PI * x) * sin(M_PI * y);
+	return 0.0;
+	return exp(x) + exp(y);
+	//return -2.0 * M_PI * M_PI * sin(M_PI * x) * sin(M_PI * y);
 }
 
 void set_element(matriz A, int i, int j, double v) {
@@ -118,6 +127,18 @@ void printMatriz(matriz A) {
 	}
 }
 
+
+void printSolucao(FILE* saida, int n, double* sol){
+	int N = n - 1;
+	int ind = 0;
+	for (int j = 0; j < n - 1; ++j) {
+		for (int i = 0; i < n - 1; ++i) {
+			fprintf(saida, "%f ", sol[ind++]);
+		}
+		fprintf(saida, "\n");
+	}
+}
+
 void laplace(int n) {
 
 	double * x = (double *) malloc(sizeof(double) * (n - 1) * (n - 1));
@@ -128,7 +149,7 @@ void laplace(int n) {
 
 	int unknows = (n - 1) * (n - 1);
 
-	FILE* saida;
+	FILE* logfile, *plotfile;
 
 	matriz A;
 
@@ -183,13 +204,13 @@ void laplace(int n) {
 		double y = (j + 1) * h;
 
 		//printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
-		b[ind] -= u(x, y) / (h * h);
+		b[ind] -= contorno(x, y) / (h * h);
 
 		ind = j * (n - 1) + n - 2;
 		x = 1.0;
 
 		//printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
-		b[ind] -= u(x, y) / (h * h);
+		b[ind] -= contorno(x, y) / (h * h);
 
 	}
 
@@ -200,59 +221,61 @@ void laplace(int n) {
 		double y = 0.0;
 
 		//printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
-		b[ind] -= u(x, y) / (h * h);
+		b[ind] -= contorno(x, y) / (h * h);
 
 		ind = (n - 2) * (n - 1) + i;
 		y = 1.0;
 
 		//printf("x=%lf\ty=%lf\tf=%lf\n", x, y, ld(x,y));
-		b[ind] -= u(x, y) / (h * h);
+		b[ind] -= contorno(x, y) / (h * h);
 
 	}
-
-//	print_matriz(&A);
-//
-//	printf("b = \n");
-//
-//	printVec(unknows, b);
-//
-//	return;
 
 	double *x0 = (double*) malloc(sizeof(double) * A.n);
 	for (int i = 0; i < A.n; ++i) {
 		x0[i] = 1.0;
 	}
 
-	//cg(A, b, x0, &rnorm);
+	cg(A, b, x0, &rnorm);
 	int niters;
-	solve_steepest_descent(A.n, A, x0, b, 1e-10, &niters, &rnorm);
+	//solve_steepest_descent(A.n, A, x0, b, 1e-10, &niters, &rnorm);
 
-	saida = fopen("saida.txt", "w");
+	logfile = fopen("log.txt", "w");
+	plotfile = fopen("saida.txt", "w");
 
-	fprintf(saida, "n = %d\n", n);
+	fprintf(logfile, "n = %d\n", n);
 
-	fprintf(saida, "\nSolucao Encontrada\n");
+	fprintf(logfile, "\nSolucao Encontrada\n");
 	for (int i = 0; i < n - 1; ++i) {
-		printVecFile(n - 1, x0 + i * (n - 1), saida);
+		printVecFile(n - 1, x0 + i * (n - 1), logfile);
 	}
+
+
+
+
+	fprintf(plotfile, "%d\n", n);
+	fprintf(plotfile, "0.000\n");
+	printSolucao(plotfile, n, x0);
 
 	double * sol = (double *) malloc(sizeof(double) * unknows);
 	calc_sol(n, sol);
 
-	fprintf(saida, "\nSolucao Real\n");
+	fprintf(logfile, "\nSolucao Real\n");
 	for (int i = 0; i < n - 1; ++i) {
-		printVecFile(n - 1, sol + i * (n - 1), saida);
+		printVecFile(n - 1, sol + i * (n - 1), logfile);
 	}
 
 	cblas_daxpy(unknows, -1.0, x0, 1, sol, 1);
 
 	double difsol = cblas_dnrm2(unknows, sol, 1);
 
-	fprintf(saida, "\n\tNorma Residuo = %e\n", rnorm);
+	fprintf(logfile, "\n\tNorma Residuo = %e\n", rnorm);
 	printf("\n\tNorma Residuo = %e\n", rnorm);
 	printf("\n\tNorma Solucao = %e\n", difsol);
 
-	fclose(saida);
+
+	fclose(logfile);
+	fclose(plotfile);
 
 }
 
