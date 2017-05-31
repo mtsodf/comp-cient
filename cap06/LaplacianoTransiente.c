@@ -108,8 +108,6 @@ void montar_matriz(double dt, int n, matriz *A){
 	for (int i = 0; i < (unknows - n + 1); ++i)
 		A->val[2][i] = 1 / (h * h);
 
-
-
 }
 
 
@@ -174,8 +172,8 @@ void metodo_implicito(double t, double dt, matriz *A, double* u0, int n) {
 
 	}
 
-
-	cg(*A, b, u0, &rnorm);
+	int iters;
+	cg(*A, b, u0, &rnorm, &iters);
 
 	printf("\tNorma CG = %e\n", rnorm);
 

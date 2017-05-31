@@ -19,7 +19,7 @@ struct struct_matriz {
 
 typedef struct struct_matriz matriz;
 
-void cg(matriz, double*, double*, double*);
-void cg_precon(matriz, double*, double*, double*);
+void cg(matriz, double*, double*, double*, int*);
+void cg_precon(matriz, double*, double*, double*, int*);
 void mat_mult(int, matriz, double*, double*);
 int solve_steepest_descent(int, matriz, double*, double*, double, int*, double*);

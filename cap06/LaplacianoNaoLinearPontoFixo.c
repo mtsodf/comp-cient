@@ -88,7 +88,39 @@ void free_matriz(matriz *A){
 }
 
 
-void laplace(int n, double * x, double* xsol) {
+void montar_matriz(int n, matriz *A){
+	int unknows = (n - 1) * (n - 1);
+	double h  = 1.0/n;
+
+	//Alocando Matriz do Laplaciano
+	A->val = (double**) malloc(sizeof(double*) * 3);
+	A->val[0] = (double *) malloc(sizeof(double) * unknows);
+	A->val[1] = (double *) malloc(sizeof(double) * (unknows - 1));
+	A->val[2] = (double *) malloc(sizeof(double) * (unknows - n + 1));
+	A->desloc = (int *) malloc(sizeof(int) * (3));
+	A->desloc[0] = 0;
+	A->desloc[1] = 1;
+	A->desloc[2] = n - 1;
+	A->nd = 3;
+	A->n = unknows;
+
+	for (int i = 0; i < (unknows); ++i)
+		A->val[0][i] = -4 / (h * h) ;
+	for (int i = 0; i < (unknows - 1); ++i) {
+		if (i % (n - 1) == n - 2) {
+			A->val[1][i] = 0.0;
+		} else {
+			A->val[1][i] = 1 / (h * h);
+		}
+
+	}
+
+	for (int i = 0; i < (unknows - n + 1); ++i)
+		A->val[2][i] = 1 / (h * h);
+
+}
+
+void laplace(matriz *A, int n, double * x, double* xsol, int *iters) {
 
 	double h = 1.0 / n;
 
@@ -96,44 +128,12 @@ void laplace(int n, double * x, double* xsol) {
 
 	int unknows = (n - 1) * (n - 1);
 
-	FILE* saida;
-
-	matriz A;
-
-	//Alocando Matriz do Laplaciano
-	A.val = (double**) malloc(sizeof(double*) * 3);
-	A.val[0] = (double *) malloc(sizeof(double) * unknows);
-	A.val[1] = (double *) malloc(sizeof(double) * (unknows - 1));
-	A.val[2] = (double *) malloc(sizeof(double) * (unknows - n + 1));
-	A.desloc = (int *) malloc(sizeof(int) * (3));
-	A.desloc[0] = 0;
-	A.desloc[1] = 1;
-	A.desloc[2] = n - 1;
-	A.nd = 3;
-	A.n = unknows;
-
 	double * b;
 
 	cblas_dcopy (unknows, x, 1, xsol, 1);
 
 
 	b = (double*) malloc(sizeof(double) * (n - 1) * (n - 1));
-
-	for (int i = 0; i < (unknows); ++i){
-		A.val[0][i] = -4 / (h * h);
-	}
-
-	for (int i = 0; i < (unknows - 1); ++i) {
-		if (i % (n - 1) == n - 2) {
-			A.val[1][i] = 0.0;
-		} else {
-			A.val[1][i] = 1 / (h * h);
-		}
-
-	}
-	for (int i = 0; i < (unknows - n + 1); ++i){
-		A.val[2][i] = 1 / (h * h);
-	}
 
 	// Criando lado direito
 	for (int j = 0; j < n - 1; ++j) {
@@ -208,9 +208,6 @@ void laplace(int n, double * x, double* xsol) {
 			double aux = (trans(T2)-trans(T1))/(2*h);
 			aux *= (T2 - T1)/(2*h);
 
-			//aux = 2*xsol[ind] ;
-			//aux *= (T2 - T1)/(2*h);
-			//aux *= (T2 - T1)/(2*h);
 			b[ind] -= aux/trans(xsol[ind]);
 
 			if(j == 0){
@@ -227,47 +224,11 @@ void laplace(int n, double * x, double* xsol) {
 			
 			aux = (trans(T2)-trans(T1))/(2*h);
 			aux *= (T2 - T1)/(2*h);
-			//aux = 2*xsol[ind] ;
-			//aux *= (T2 - T1)/(2*h);
-			//aux *= (T2 - T1)/(2*h);
 			b[ind] -= aux/trans(xsol[ind]);
 		}
 	}	
 
-
-	cg(A, b, xsol, &rnorm);
-	
-	saida = fopen("saida.txt", "w");
-
-	fprintf(saida, "n = %d\n", n);
-
-	fprintf(saida, "\nSolucao Encontrada\n");
-	for (int i = 0; i < n - 1; ++i) {
-		printVecFile(n - 1, xsol + i * (n - 1), saida);
-	}
-
-
-	double * sol = (double *) malloc(sizeof(double) * unknows);
-	calc_sol(n, sol);
-
-	fprintf(saida, "\nSolucao Real\n");
-	for (int i = 0; i < n - 1; ++i) {
-		printVecFile(n - 1, sol + i * (n - 1), saida);
-	}
-
-	cblas_daxpy(unknows, -1.0, xsol, 1, sol, 1);
-
-	double difsol = cblas_dnrm2(unknows, sol, 1);
-
-	fprintf(saida, "\n\tNorma Residuo = %e\n", rnorm);
-	printf("\n\tNorma Residuo = %e\n", rnorm);
-	printf("\n\tNorma Solucao = %e\n", difsol);
-	fprintf(saida, "\n\tNorma Solucao = %e\n", difsol);
-
-	fclose(saida);
-
-	free_matriz(&A);
-	free(sol);
+	cg(*A, b, xsol, &rnorm, iters);
 
 }
 
@@ -292,22 +253,45 @@ int main(int argc, char **argv) {
 		x1[i] = 1.0;	
 	}
 
+	matriz A;
+
+	montar_matriz(n, &A);
+	int iters_total = 0, iters;
+
 	double rnorm = 1.0;
-	for (int i = 0; i < MAXITER && rnorm > 1e-10; ++i)
+	int i;
+	for (i = 0; i < MAXITER && rnorm > 1e-6; ++i)
 	{
-		laplace(n, x1, x2);
+		laplace(&A, n, x1, x2, &iters);
 
 		cblas_daxpy (unknows, -1.0, x2, 1, x1, 1);
 
 		rnorm = cblas_dnrm2 (unknows, x1, 1);
 
-		printf("\t%d rnorm  = %lf\n", i, rnorm);
+		printf("\t%d rnorm  = %e\n", i, rnorm);
 
 		aux = x2;
 		x2 = x1;
 		x1 = aux;
+
+		iters_total += iters;
 	}
-	
+
+	printf("Total de Iteracoes = %d\n", iters_total);
+
+	double * sol = (double *) malloc(sizeof(double) * unknows);
+	calc_sol(n, sol);
+
+	cblas_daxpy(unknows, -1.0, x1, 1, sol, 1);
+
+	double difsol = cblas_dnrm2(unknows, sol, 1);
+
+	printf("\n\tNorma Residuo = %e\n", rnorm);
+	printf("\n\tNorma Solucao = %e\n", difsol/unknows);
+
+	printf("%d\t%d\t%d\t%e\n", n, i, iters_total, difsol/unknows);
+
+	free(sol);	
 	free(x1);
 	free(x2);
 

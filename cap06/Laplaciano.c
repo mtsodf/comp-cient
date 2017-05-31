@@ -34,12 +34,12 @@ void printVecFile(int n, double *v, FILE* f) {
  * Solucao analitica
  */
 double u(double x, double y) {
-	return exp(x) + exp(y);
-	//return sin(M_PI * x) * sin(M_PI * y);
+	//return exp(x) + exp(y);
+	return sin(M_PI * x) * sin(M_PI * y);
 }
 
 double contorno(double x, double y){
-	//return u(x,y);
+	return u(x,y);
 	if(y>=1 || x<=0){
 		return 1.0;
 	}
@@ -47,9 +47,9 @@ double contorno(double x, double y){
 }
 
 double ld(double x, double y) {
-	return 0.0;
-	return exp(x) + exp(y);
-	//return -2.0 * M_PI * M_PI * sin(M_PI * x) * sin(M_PI * y);
+	//return 0.0;
+	//return exp(x) + exp(y);
+	return -2.0 * M_PI * M_PI * sin(M_PI * x) * sin(M_PI * y);
 }
 
 void set_element(matriz A, int i, int j, double v) {
@@ -236,9 +236,11 @@ void laplace(int n) {
 		x0[i] = 1.0;
 	}
 
-	cg(A, b, x0, &rnorm);
+	
 	int niters;
-	//solve_steepest_descent(A.n, A, x0, b, 1e-10, &niters, &rnorm);
+	cg(A, b, x0, &rnorm, &niters);
+	solve_steepest_descent(A.n, A, x0, b, 1e-6, &niters, &rnorm);
+	printf("Numero de iteracoes %d\n", niters);
 
 	logfile = fopen("log.txt", "w");
 	plotfile = fopen("saida.txt", "w");
@@ -271,7 +273,7 @@ void laplace(int n) {
 
 	fprintf(logfile, "\n\tNorma Residuo = %e\n", rnorm);
 	printf("\n\tNorma Residuo = %e\n", rnorm);
-	printf("\n\tNorma Solucao = %e\n", difsol);
+	printf("\n\tNorma Solucao = %e\n", difsol/unknows);
 
 
 	fclose(logfile);

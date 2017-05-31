@@ -3,8 +3,17 @@
 #include <math.h>
 #include <gsl/gsl_spmatrix.h>
 #include <gsl/gsl_splinalg.h>
+#include <sys/time.h>
 
 #define dT  0.0001
+
+
+void contar_tempo(int comeco_fim, int num){
+	static double inicio[100];
+	static double acumulado[100];
+
+	
+}
 
 
 /*
@@ -322,6 +331,19 @@ void calc_jacobiano_analitico(gsl_spmatrix* A, int n, gsl_vector *T) {
 	}
 }
 
+void solver_linear( gsl_splinalg_itersolve *solver, gsl_spmatrix* A , gsl_vector* b, gsl_vector* x, float tol, int *iter, double *rnorm){
+	size_t max_iter = 2000;
+	//Resolucao de Sistema Linear
+	*iter = 0;
+	int status;
+
+	do{
+		status = gsl_splinalg_itersolve_iterate(A, b, tol, x, solver);
+		*iter += 1;
+	}while(status == GSL_CONTINUE && *iter < max_iter);
+	*rnorm = gsl_splinalg_itersolve_normr(solver);
+}
+
 
 int main(int argc, char **argv) {
 
@@ -329,9 +351,9 @@ int main(int argc, char **argv) {
 	
 
 	int unknows = (n - 1) * (n - 1);
-	int status, iter, newton_steps = 0;
+	int iters, newton_steps = 0;
 	double tol_linear = 1.0e-6; /* solution relative tolerance linear solver */
-	size_t max_iter = 1000;     /* maximum iterations */
+	     /* maximum iterations */
 	double tol_newton = 1e-4;
 	const gsl_splinalg_itersolve_type *Solver = gsl_splinalg_itersolve_gmres;
 	double rnorm;
@@ -353,7 +375,7 @@ int main(int argc, char **argv) {
 	}
 
 	gsl_spmatrix* A = gsl_spmatrix_alloc_nzmax(unknows, unknows, 5 * unknows, GSL_SPMATRIX_TRIPLET);
-
+	gsl_spmatrix* C;
 	//Alocando Vetores
 	gsl_vector* r = gsl_vector_alloc(unknows);
 	gsl_vector* dx = gsl_vector_alloc(unknows);
@@ -373,12 +395,15 @@ int main(int argc, char **argv) {
 	printf("Residuo Inicial = %lf\n\n", rnorm);
 	printf("*************************************************************************\n");
 
+	int total_iters = 0;
 
 	//Metodo de Newton
 	do {
 		printf("Passo de Newton %d\n", newton_steps++);
+
+		printf("\tCalculo Jacobiano\n");
 		calc_jacobiano(A, n, T);
-		//gsl_vector_fprintf(stdout, jacobi, "%e");
+		printf("\tFim Calculo Jacobiano\n");
 
 		//Aplicar Precondicionador Jacobi
 		if(use_jacobi){
@@ -386,14 +411,13 @@ int main(int argc, char **argv) {
 			apply_jacobi_mat(A, jacobi);
 			apply_jacobi_vec(r, jacobi);
 		}
-		//Resolucao de Sistema Linear
-		iter = 0;
-		do{
-			status = gsl_splinalg_itersolve_iterate(A, r, tol_linear, dx, gmres_solver);
-		}while(status == GSL_CONTINUE && ++iter < max_iter);
 
-		rnorm = gsl_splinalg_itersolve_normr(gmres_solver);
-		printf("\tIteracoes Lineares = %d\n\trnorm_linear = %e\n", iter, rnorm);
+		C = gsl_spmatrix_crs(A);
+		printf("\tInicio Solver Linear\n");
+		solver_linear(gmres_solver, C, r, dx, tol_linear, &iters, &rnorm);
+		printf("\tFim Solver Linear\n");
+		printf("\tIteracoes Lineares = %d\n\trnorm_linear = %e\n", iters, rnorm);
+		total_iters += iters;
 
 		//Atualizacao de T
 		gsl_blas_daxpy(1.0, dx, T);
@@ -440,6 +464,8 @@ int main(int argc, char **argv) {
 	printf("\nNorma Residuo = %e\n", difsol);
 
 	fclose(saida);
+
+	printf("%d\t%d\t%d\t%e\n", n, newton_steps, total_iters, difsol/unknows);
 
 	gsl_vector_free(sol);
 	gsl_vector_free(T);

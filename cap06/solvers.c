@@ -41,7 +41,7 @@ void mat_mult(int n, matriz A, double *b, double *r){
 	free(aux);
 }
 
-void cg_precon(matriz A, double* b, double * x0, double *rnorm){
+void cg_precon(matriz A, double* b, double * x0, double *rnorm, int *iters){
 	double *r, *p, *z, *invD;
 	double *Ap;
 	double  alpha, rdotr, rdotr2, beta;
@@ -71,9 +71,7 @@ void cg_precon(matriz A, double* b, double * x0, double *rnorm){
 	cblas_dcopy (A.n, z, 1, p, 1);
 
 
-	int iters = 0;
-
-	while(*rnorm > 1e-10){
+	while(*rnorm > 1e-6){
 		mat_mult(A.n, A, p, Ap);
 
 		rdotr = cblas_ddot(A.n, r, 1, z, 1);
@@ -97,10 +95,10 @@ void cg_precon(matriz A, double* b, double * x0, double *rnorm){
 
 		*rnorm = cblas_dnrm2 (A.n, r, 1);
 
-		iters++;
+		(*iters)++;
 	}
 
-	printf("Convergiu em %d iteracoes\n", iters);
+	printf("Convergiu em %d iteracoes\n", *iters);
 
 	free(Ap);
 	free(p);
@@ -109,7 +107,7 @@ void cg_precon(matriz A, double* b, double * x0, double *rnorm){
 	
 }
 
-void cg(matriz A, double* b, double * x0, double *rnorm){
+void cg(matriz A, double* b, double * x0, double *rnorm, int *iters){
 	double *r, *p;
 	double *Ap;
 	double  alpha, rdotr, rdotr2, beta;
@@ -126,9 +124,9 @@ void cg(matriz A, double* b, double * x0, double *rnorm){
 	*rnorm = cblas_dnrm2 (A.n, r, 1);
 	cblas_dcopy (A.n, r, 1, p, 1);
 
-	int iters = 0;
+	*iters = 0;
 
-	while(*rnorm > 1e-10){
+	while(*rnorm > 1e-6){
 		mat_mult(A.n, A, p, Ap);
 
 		rdotr = cblas_ddot(A.n, r, 1, r, 1);
@@ -150,10 +148,11 @@ void cg(matriz A, double* b, double * x0, double *rnorm){
 
 		*rnorm = sqrt(rdotr2);
 
-		iters++;
+		(*iters)++;
 	}
 
-	printf("Convergiu em %d iteracoes\n", iters);
+	printf("Convergiu em %d iteracoes\n", *iters);
+
 
 	free(Ap);
 	
@@ -182,7 +181,7 @@ int solve_steepest_descent(int N, matriz A, double* x, double* b, double tol, in
 
 	int convergiu = FALSE;
 	int i;
-	for (i = 0; (!convergiu) && (i < MAXITER); i++) {
+	for (i = 0; (!convergiu) ; i++) {
 		//alpha = <r, r>/<p, r>
 		double alpha1 = cblas_ddot(N, b, 1, b, 1);
 		double alpha2 = cblas_ddot(N, p, 1, b, 1);
@@ -195,8 +194,7 @@ int solve_steepest_descent(int N, matriz A, double* x, double* b, double tol, in
 		cblas_daxpy(N, -alpha, p, 1, b, 1);
 
 		*res = cblas_dnrm2(N, b, 1);
-
-		printf("Residuo = %f\n", *res);
+		if(i%1000==0) printf("%d - Residuo = %f\n", i, *res);
 
 		if (*res < tol)
 			convergiu = TRUE;
